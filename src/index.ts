@@ -15,6 +15,7 @@ async function main(): Promise<void> {
 
     const testBuffer = Buffer.from([1, 2, 3, 4, 5])
     console.log("buffer: ", testBuffer)
+    console.log("base64 buffer: ", testBuffer.toString('base64'))
 
     // insert data into the database using the engine
     await prisma.testRecord.create({
@@ -35,8 +36,11 @@ async function main(): Promise<void> {
             }
         }
     })
-
     console.log("GOT", findAllResult)
+
+    const readRawResult = await prisma.$queryRaw`SELECT * FROM "TestRecord" WHERE name ~ ${sessionName}`
+
+    console.log("Raw Read:", readRawResult)
 
 }
 
