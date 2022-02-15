@@ -12,5 +12,10 @@ yarn install
 export DATABASE_URL='postgresql://postgres:pgbin@localhost:5555/postgres?schema=public&connection_limit=5'
 yarn prisma migrate dev
 
+tsc && node ./build/index.js
+```
+
+I did local dev on this with: 
+```
 find src | entr -cs "tsc && node ./build/index.js"
 ```
