@@ -1,0 +1,9 @@
+{
+  "include": ["src/**/*"],
+
+  "compilerOptions": {
+    "outDir": "build/",
+    "esModuleInterop": true,
+    "lib": ["es6", "dom", "esnext"],
+  }
+}
