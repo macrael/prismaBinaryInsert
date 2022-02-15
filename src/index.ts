@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, TestRecord } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 const foo: number = 10
@@ -10,12 +10,13 @@ async function main(): Promise<void> {
     // get a connection to Prisma
     const prisma = new PrismaClient()
 
-    // name for this session, so you can find all the stuff from this go
-    const sessionName = randomBytes(20).toString('base64').slice(0, 10)
+    // random name for this session, findAll can filter out previous runs.
+    const sessionName = randomBytes(20).toString('hex').slice(0, 10)
 
     const testBuffer = Buffer.from([1, 2, 3, 4, 5])
+    const testBufferBase64 = testBuffer.toString('base64')
     console.log("buffer: ", testBuffer)
-    console.log("base64 buffer: ", testBuffer.toString('base64'))
+    console.log("base64 buffer: ", testBufferBase64)
 
     // insert data into the database using the engine
     await prisma.testRecord.create({
@@ -25,9 +26,20 @@ async function main(): Promise<void> {
         }
     })
 
-    await prisma.$queryRaw`INSERT INTO "TestRecord" (name, "binData") 
+    await prisma.$executeRaw`INSERT INTO "TestRecord" (name, "binData") 
                                             VALUES (${sessionName + '-raw'}, ${testBuffer})`
+    // this encodes in base64 the string: `{"type":"Buffer","data":[1,2,3,4,5]}`
 
+    await prisma.$executeRaw`INSERT INTO "TestRecord" (name, "binData") 
+                                            VALUES (${sessionName + '-rawBase64'}, ${testBufferBase64})`
+    // this encodes in base64, the base64 string.
+
+    await prisma.$executeRawUnsafe(
+        'INSERT INTO "TestRecord" (name, "binData") VALUES ($1, $2)',
+        sessionName + '-rawUnsafe',
+        testBuffer,
+    )
+    // this does the exact same as -raw.
 
     const findAllResult = await prisma.testRecord.findMany({
         where: {
@@ -36,11 +48,28 @@ async function main(): Promise<void> {
             }
         }
     })
-    console.log("GOT", findAllResult)
+    console.log("Engine Read:", findAllResult)
 
-    const readRawResult = await prisma.$queryRaw`SELECT * FROM "TestRecord" WHERE name ~ ${sessionName}`
+    type ActualReturnValue = TestRecord & {
+        binData: string
+    }
 
-    console.log("Raw Read:", readRawResult)
+
+    const readRawResult = await prisma.$queryRaw<ActualReturnValue[]>`SELECT * FROM "TestRecord" WHERE name ~ ${sessionName}`
+
+    if (!readRawResult) {
+        throw new Error('got nothing back')
+    }
+
+    console.log("Raw Read:", readRawResult.map(r => {
+
+        return {
+            name: r.name,
+            binRaw: r.binData,
+            decoded: Buffer.from(r.binData, 'base64'),
+            stringForm: Buffer.from(r.binData, 'base64').toString(),
+        }
+    }))
 
 }
 
